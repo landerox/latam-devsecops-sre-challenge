@@ -1,0 +1,38 @@
+[
+  {
+    "description": "Purchase rate of the US dollar",
+    "mode": "NULLABLE",
+    "name": "buy_rate",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Selling rate of the US dollar. Required field.",
+    "mode": "REQUIRED",
+    "name": "sell_rate",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Closing rate of the US dollar. Required field.",
+    "mode": "REQUIRED",
+    "name": "closing_rate",
+    "type": "NUMERIC"
+  },
+  {
+    "description": "Name of the exchange rate. Required field.",
+    "mode": "REQUIRED",
+    "name": "exchange_name",
+    "type": "STRING"
+  },
+  {
+    "description": "Currency used for the exchange (e.g., USD). Required field.",
+    "mode": "REQUIRED",
+    "name": "currency",
+    "type": "STRING"
+  },
+  {
+    "description": "Timestamp of the last update in the format 'YYYY-MM-DD HH:MM:SS'. Required field.",
+    "mode": "REQUIRED",
+    "name": "load_ts",
+    "type": "TIMESTAMP"
+  }
+]

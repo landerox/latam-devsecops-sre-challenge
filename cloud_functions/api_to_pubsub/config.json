@@ -1,0 +1,5 @@
+{
+  "project_id": "cloud-landerox",
+  "pubsub_topic": "currency-exchange-rate-topic",
+  "usd_api_url": "https://cl.dolarapi.com/v1/cotizaciones"
+}
