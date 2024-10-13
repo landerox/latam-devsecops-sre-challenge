@@ -1,0 +1,6 @@
+{
+  "dataset_id": "exchange_rates",
+  "project_id": "cloud-landerox",
+  "subscription_name": "currency-exchange-rate-subscription",
+  "table_name": "currency_exchange_rate"
+}

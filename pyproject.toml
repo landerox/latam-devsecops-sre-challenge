@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "latam-devsecops-sre-challenge"
+version = "0.0.1"
+description = "This repository contains the solution for the LATAM Airlines DevSecOps/SRE challenge."
+authors = ["Fernando Landero <landerox@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pandas = "^2.2.3"
+requests = "^2.32.3"
+fastapi = "^0.115.0"
+uvicorn = "^0.31.1"
+google-cloud-bigquery = "^3.26.0"
+pydantic = "^2.9.2"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.6.9"
+sqlfluff = "^3.2.3"
+pytest = "^8.3.3"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# https://beta.ruff.rs/docs/configuration/
+select = [
+  "E",   # Style errors (Pycodestyle)
+  "F",   # Flake8 errors
+  "W",   # Warnings (Pycodestyle)
+  "C",   # Conventions (Pycodestyle)
+  "N",   # Naming conventions (PEP8Naming)
+  "D",   # Docstrings (pydocstyle)
+  "S",   # Security issues (Bandit)
+  "I",   # Import conventions (isort)
+  "B",   # BugBear errors (Flake8-Bugbear)
+  "ANN", # Type annotations (Flake8-Annotations)
+  "SIM", # Simplifications (Flake8-Simplify)
+  "ARG", # Argument-related issues (Flake8-Argument-checker)
+  "C4",  # Custom category 4 (specific to your setup)
+]
+ignore = ['W291', 'W292', 'W293']
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

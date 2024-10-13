@@ -1,0 +1,126 @@
+# CI/CD Workflow for Building and Deploying to Google Cloud Platform
+#
+# This GitHub Actions workflow is triggered on push events to the "main" or "develop" branches,
+# and can also be triggered manually using the workflow_dispatch event.
+# The workflow authenticates to Google Cloud, builds a Docker image, pushes it to Artifact Registry,
+# and applies Terraform configurations to manage infrastructure resources.
+
+name: CI/CD Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+      # Environment variables for Google Cloud and Terraform configurations
+    env:
+      SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      LOCATION: ${{ secrets.GCP_LOCATION }}
+      REGION: ${{ secrets.GCP_REGION }}
+      BUCKET_NAME: ${{ secrets.GCP_BUCKET }}
+      TERRAFORM_STATE: ${{ secrets.GCP_TERRAFORM_STATE }}
+      TERRAFORM_DIR: ./terraform
+      REPOSITORY: "gcf-artifacts"
+      IMAGE_NAME: "exchange-api"
+      TAG: "latest"
+
+    steps:
+      # Paso 1: Clonar el repositorio
+      - name: Checkout code
+        uses: actions/checkout@v4.2.1
+
+      # Paso 2: Autenticarse en Google Cloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2.1.6
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # Paso 3: Configurar Google Cloud SDK
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2.1.1
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          install_components: gcloud
+
+      # Verificar la autenticación en Google Cloud
+      - name: Verify authentication
+        run: gcloud auth list
+
+      # Paso 4: Configurar autenticación de Docker con Artifact Registry
+      - name: Configure Docker for GCP Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      # Paso 5: Construir y empujar la imagen Docker al Google Cloud Artifact Registry
+      - name: Build and Push Docker Image to GCP Artifact Registry
+        run: docker build -f Dockerfile -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.TAG }} . && docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/gcf-artifacts/${{ env.IMAGE_NAME }}:${{ env.TAG }}
+
+      # Paso 6: Configurar el caché de plugins de Terraform
+      - name: Ensure plugin cache directory exists
+        run: mkdir -p ~/.terraform.d/plugin-cache
+
+      # Paso 7: Cachear Terraform
+      - name: Cache Terraform
+        uses: actions/cache@v4.1.1
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: ${{ runner.os }}-terraform-${{ hashFiles('**/*.tf') }}
+
+      # Paso 8: Configurar Terraform
+      - name: HashiCorp - Setup Terraform
+        uses: hashicorp/setup-terraform@v3.1.2
+        with:
+          terraform_wrapper: false
+
+      # Paso 9: Inicializar Terraform
+      - name: Terraform Init
+        run: terraform -chdir=${{ env.TERRAFORM_DIR }} init -backend-config="bucket=${{ env.BUCKET_NAME }}" -backend-config="prefix=${{ env.TERRAFORM_STATE }}"
+
+      # Paso 10: Validar la configuración de Terraform
+      - name: Terraform Validate
+        run: terraform -chdir=${{ env.TERRAFORM_DIR }} validate
+
+      # Paso 11: Crear el plan de Terraform
+      - name: Terraform Plan
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: terraform -chdir=${{ env.TERRAFORM_DIR }} plan -out=tfplan -var="project_id=${{ env.PROJECT_ID }}" -var="location=${{ env.LOCATION }}" -var="region=${{ env.REGION }}" -var="bucket_name=${{ env.BUCKET_NAME }}" -var="terraform_state=${{ env.TERRAFORM_STATE }}" -var="repository=${{ env.REPOSITORY }}" -var="image_name=${{ env.IMAGE_NAME }}" -var="tag=${{ env.TAG }}" -var="service_account_email=${{ env.SERVICE_ACCOUNT_EMAIL }}"
+
+      # Paso 12: Subir el plan de Terraform como un artefacto
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: ${{ env.TERRAFORM_DIR }}/tfplan
+          retention-days: 1
+
+      # Paso 13: Generar documentación de Terraform
+      - name: Generate terraform docs and push changes back to PR
+        uses: terraform-docs/gh-actions@main
+        with:
+          working-dir: ${{ env.TERRAFORM_DIR }}
+          output-file: README.md
+          output-method: inject
+          git-push: "true"
+
+      # Paso 14: Aplicar el plan de Terraform
+      - name: Terraform Apply
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: terraform -chdir=${{ env.TERRAFORM_DIR }} apply -auto-approve -var="project_id=${{ env.PROJECT_ID }}" -var="location=${{ env.LOCATION }}" -var="region=${{ env.REGION }}" -var="bucket_name=${{ env.BUCKET_NAME }}" -var="terraform_state=${{ env.TERRAFORM_STATE }}" -var="repository=${{ env.REPOSITORY }}" -var="image_name=${{ env.IMAGE_NAME }}" -var="tag=${{ env.TAG }}" -var="service_account_email=${{ env.SERVICE_ACCOUNT_EMAIL }}"
+
+      # Paso 15: Probar la API REST para verificar que expone los datos desde BigQuery o Cloud SQL
+      - name: Run Integration Test - API exposes data
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://exchange-api-73859077778.us-central1.run.app/exchange-rates)
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "API is not exposing data from the database correctly. Test failed."
+            exit 1
+          fi
+          echo "API is exposing data successfully. Test passed."
